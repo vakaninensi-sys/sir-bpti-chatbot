@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sir BPTI Bhavnagar | College Chatbot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">B</div>
+        <div><strong>Sir BPTI Bhavnagar</strong><small>College assistant</small></div>
+      </div>
+      <button class="new-chat" id="newChat">＋ New chat</button>
+      <div class="side-label">SUGGESTED TOPICS</div>
+      <button class="topic" data-prompt="How can I take admission?">🎓 <span>Admission</span></button>
+      <button class="topic" data-prompt="Tell me about courses">📚 <span>Courses</span></button>
+      <button class="topic" data-prompt="What facilities are available?">🏫 <span>Facilities</span></button>
+      <button class="topic" data-prompt="Tell me about placements">💼 <span>Placements</span></button>
+      <div class="sidebar-bottom">
+        <div class="status-dot"></div>
+        <span>Local chatbot is ready</span>
+      </div>
+    </aside>
+
+    <section class="chat-area">
+      <header class="topbar">
+        <div class="mobile-brand"><div class="brand-mark small">B</div><strong>Sir BPTI Bhavnagar</strong></div>
+        <div class="bot-status"><span class="status-dot"></span> BPTI College Bot <span class="online">• Online</span></div>
+        <button class="clear-btn" id="clearChat" title="Clear conversation">Clear chat</button>
+      </header>
+
+      <div class="messages" id="messages" aria-live="polite">
+        <div class="welcome" id="welcome">
+          <div class="welcome-icon">✦</div>
+          <p class="eyebrow">YOUR COLLEGE ASSISTANT</p>
+          <h1>Hey there! 👋<br>How can I help you?</h1>
+          <p class="welcome-copy">Ask about Sir BPTI Bhavnagar, the IT Diploma, subjects, labs, department activities, contact details, or basic programming.</p>
+          <div class="suggestion-grid">
+            <button data-prompt="How can I take admission?"><span>🎓</span><b>Admission</b><small>Process and documents</small></button>
+            <button data-prompt="What courses are available?"><span>📚</span><b>Courses</b><small>Course information</small></button>
+            <button data-prompt="What are the college facilities?"><span>🏫</span><b>Facilities</b><small>Campus support</small></button>
+            <button data-prompt="What is a chatbot?"><span>🤖</span><b>About chatbot</b><small>How this system works</small></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer-wrap">
+        <form class="composer" id="chatForm">
+          <textarea id="messageInput" rows="1" maxlength="1000" placeholder="Message your college assistant..." aria-label="Type your message"></textarea>
+          <button class="send-btn" type="submit" aria-label="Send message">↑</button>
+        </form>
+        <p class="disclaimer">Responses are based on the local knowledge base. Verify exact dates, fees, and official notices with your college.</p>
+      </div>
+    </section>
+  </main>
+  <script>
+    const messages = document.getElementById('messages');
+    const welcome = document.getElementById('welcome');
+    const form = document.getElementById('chatForm');
+    const input = document.getElementById('messageInput');
+    const sendBtn = form.querySelector('button');
+    let sending = false;
+
+    function scrollBottom() { messages.scrollTop = messages.scrollHeight; }
+    function addMessage(text, who, time) {
+      if (welcome && welcome.parentNode) welcome.remove();
+      const row = document.createElement('div');
+      row.className = 'message-row ' + (who === 'user' ? 'user-row' : 'bot-row');
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar ' + (who === 'user' ? 'user-avatar' : 'bot-avatar');
+      avatar.textContent = who === 'user' ? 'You' : 'B';
+      const bubbleWrap = document.createElement('div');
+      bubbleWrap.className = 'bubble-wrap';
+      const label = document.createElement('div');
+      label.className = 'message-label';
+      label.textContent = who === 'user' ? 'You' : 'BPTI College Bot';
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = text;
+      const stamp = document.createElement('div');
+      stamp.className = 'timestamp';
+      stamp.textContent = time || new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      bubbleWrap.append(label, bubble, stamp);
+      row.append(avatar, bubbleWrap);
+      messages.appendChild(row);
+      scrollBottom();
+    }
+    function addTyping() {
+      const row = document.createElement('div');
+      row.className = 'message-row bot-row typing-row';
+      row.innerHTML = '<div class="avatar bot-avatar">B</div><div class="bubble typing"><i></i><i></i><i></i></div>';
+      messages.appendChild(row);
+      scrollBottom();
+      return row;
+    }
+    async function sendMessage(text) {
+      text = (text || '').trim();
+      if (!text || sending) return;
+      sending = true; sendBtn.disabled = true;
+      addMessage(text, 'user');
+      input.value = ''; input.style.height = 'auto';
+      const typing = addTyping();
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({message: text})
+        });
+        const data = await response.json();
+        typing.remove();
+        if (!response.ok) throw new Error(data.error || 'Unable to send message.');
+        addMessage(data.response, 'bot');
+      } catch (error) {
+        typing.remove();
+        addMessage('Sorry, something went wrong. Please try again.', 'bot');
+      } finally {
+        sending = false; sendBtn.disabled = false; input.focus();
+      }
+    }
+    form.addEventListener('submit', e => { e.preventDefault(); sendMessage(input.value); });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+    });
+    input.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 130) + 'px';
+    });
+    document.querySelectorAll('[data-prompt]').forEach(btn => {
+      btn.addEventListener('click', () => sendMessage(btn.dataset.prompt));
+    });
+    async function clearConversation() {
+      try {
+        const response = await fetch('/api/clear', {method:'POST', cache:'no-store'});
+        if (!response.ok) throw new Error('Could not clear history');
+        messages.innerHTML = `
+          <div class="welcome" id="welcome">
+            <div class="welcome-icon">✦</div><p class="eyebrow">SIR BPTI BHAVNAGAR</p>
+            <h1>Hey there! 👋<br>How can I help you?</h1>
+            <p class="welcome-copy">Ask about the IT Diploma, semester subjects, labs, department activities, contact details, or basic programming.</p>
+            <div class="suggestion-grid">
+              <button data-prompt="Tell me about the IT Diploma"><span>🎓</span><b>IT Diploma</b><small>Course information</small></button>
+              <button data-prompt="What subjects are in Semester 1?"><span>📚</span><b>Subjects</b><small>Semester information</small></button>
+              <button data-prompt="What facilities are available in the IT department?"><span>🏫</span><b>Facilities</b><small>Labs and learning</small></button>
+              <button data-prompt="What is Viditam?"><span>💻</span><b>IT activities</b><small>Tech fest information</small></button>
+            </div>
+          </div>`;
+        messages.querySelectorAll('[data-prompt]').forEach(btn => btn.addEventListener('click', () => sendMessage(btn.dataset.prompt)));
+        input.value = '';
+        scrollBottom();
+      } catch (error) {
+        addMessage('I could not clear the saved chat. Please try again.', 'bot');
+      }
+    }
+    document.getElementById('clearChat').addEventListener('click', clearConversation);
+    document.getElementById('newChat').addEventListener('click', clearConversation);
+    // Start with a fresh conversation each time the page is opened or refreshed.
+    // Older messages are deliberately not restored into the visible chat.
+  </script>
+</body>
+</html>
